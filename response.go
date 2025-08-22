@@ -28,6 +28,23 @@ func formatResponse(r *Response) string {
 	return result
 }
 
+func NewResponse(status HTTPStatus, headers map[string]string, message string) *Response {
+	response := Response{
+		status,
+		"HTTP/1.1",
+		make(map[string]string),
+		message,
+	}
+	response.Headers = headers
+	return &response
+}
+
+func PlainTextHeaders() map[string]string {
+	headers := make(map[string]string)
+	headers["Content-Type"] = "text/plain"
+	return headers
+}
+
 const (
 	// 2xx Success
 	StatusOK        HTTPStatus = 200

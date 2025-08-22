@@ -43,7 +43,7 @@ func (r *Router) FindHandler(req *Request) (func(*Request) *Response, error) {
 				if req.PathParams == nil {
 					req.PathParams = make(map[string]string)
 				}
-				paramName := splitedRoute[i][1 : len(splitedRoute[i])-2]
+				paramName := splitedRoute[i][1 : len(splitedRoute[i])-1]
 				req.PathParams[paramName] = req.PathSegments[i]
 				continue
 			}

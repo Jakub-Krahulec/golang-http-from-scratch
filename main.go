@@ -1,88 +1,87 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 )
 
 type Server struct {
-	Addr    string
-	Network string
-	Router  Router
+	Addr     string
+	Network  string
+	Router   Router
+	Listener net.Listener
 }
 
 func main() {
+	server := setupServer()
+	server.startListening()
+	defer server.Listener.Close()
+	server.setupHandlers()
+	server.handleConnections()
+}
+
+func setupServer() Server {
 	server := Server{
 		Addr:    "localhost:8080",
 		Network: "tcp",
 		Router:  Router{},
 	}
+	return server
+}
 
+func (s *Server) startListening() {
 	fmt.Printf("Starting server")
 
-	l, err := net.Listen(server.Network, server.Addr)
+	l, err := net.Listen(s.Network, s.Addr)
 	if err != nil {
 		panic(err)
 	}
+	s.Listener = l
+}
 
-	defer l.Close()
-
-	server.setupHandlers()
-
+func (s *Server) handleConnections() {
 	for {
-		conn, err := l.Accept()
+		conn, err := s.Listener.Accept()
 		if err != nil {
 			panic(err)
 		}
 
 		go func(conn net.Conn) {
-			buf := make([]byte, 1024)
-			len, err := conn.Read(buf)
+			defer conn.Close()
+			buf, bufLen, err := readBytes(conn)
 			if err != nil {
-				fmt.Printf("Error reading: %#v\n", err)
+				return
+			}
+			r, err := parseRequest(string(buf[:bufLen]))
+			if err != nil {
+				response := NewResponse(StatusBadRequest, PlainTextHeaders(), "Could not parse request")
+				conn.Write([]byte(formatResponse(response)))
 				return
 			}
 
-			fmt.Print("JSEM ZDE\n\n\n\n")
-			fmt.Printf("Message received: %s\n", string(buf[:len]))
-			r, err := parseRequest(string(buf[:len]))
+			handler, err := s.Router.FindHandler(r)
 			if err != nil {
-				fmt.Print("\n\nSelhalo parsovani requestu\n\n")
-				fmt.Printf("%v", err)
-				response := Response{
-					StatusBadRequest,
-					"HTTP/1.1",
-					make(map[string]string),
-					"",
-				}
-				response.Headers["Content-Type"] = "text/plain"
-				conn.Write([]byte(formatResponse(&response)))
-				conn.Close()
+				response := NewResponse(StatusNotFound, PlainTextHeaders(), "")
+				conn.Write([]byte(formatResponse(response)))
 				return
 			}
 
-			fmt.Printf("%v       %v", r.Method, r.Path)
-			handler, err := server.Router.FindHandler(r)
-			if err != nil {
-				response := Response{
-					StatusNotFound,
-					"HTTP/1.1",
-					make(map[string]string),
-					"",
-				}
-				response.Headers["Content-Type"] = "text/plain"
-				conn.Write([]byte(formatResponse(&response)))
-				conn.Close()
-				return
-			}
-
-			fmt.Print("Dosel jsem az sem")
 			response := handler(r)
 
 			conn.Write([]byte(formatResponse(response)))
-			conn.Close()
 		}(conn)
 	}
+}
+
+func readBytes(conn net.Conn) ([]byte, int, error) {
+	buf := make([]byte, 1024)
+	len, err := conn.Read(buf)
+	if err != nil {
+		fmt.Printf("Error reading: %#v\n", err)
+		return make([]byte, 1), 0, errors.New("cannot read connection")
+	}
+	return buf, len, nil
 }
 
 func (s *Server) setupHandlers() {
@@ -90,30 +89,4 @@ func (s *Server) setupHandlers() {
 	s.Router.AddHandler(GET, "", userHandler)
 	s.Router.AddHandler(GET, "/", userHandler)
 	s.Router.AddHandler(GET, "/user/{id}/posts", userPostsHandler)
-}
-
-func userPostsHandler(r *Request) *Response {
-	s := ""
-	for key, value := range r.PathParams {
-		s += key + " " + value + " "
-	}
-	response := Response{
-		StatusOK,
-		"HTTP/1.1",
-		make(map[string]string),
-		"Nazdar vitaj user id" + s,
-	}
-	response.Headers["Content-Type"] = "text/plain"
-	return &response
-}
-
-func userHandler(*Request) *Response {
-	response := Response{
-		StatusOK,
-		"HTTP/1.1",
-		make(map[string]string),
-		"Nazdar vitaj",
-	}
-	response.Headers["Content-Type"] = "text/plain"
-	return &response
 }
