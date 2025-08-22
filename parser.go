@@ -6,38 +6,79 @@ import (
 	"strings"
 )
 
+// TODO: Finish secturity after reading about it and move checks to right places
+func checkSecurityIssues(s string) error {
+	// CRLF Injection -
+	// CR and LF are special characters in ASCII 13 and 10 - /r /n1 - used in windows and internet protocols including http
+	// it is used to add http headers into http response
+	// also used to falsifie logs by inserting lines and hide antoher attacks or confuse admins
+	if strings.Contains(s, "\r\r") || strings.Contains(s, "\n\n") {
+		return errors.New("Potential CRLF injection")
+	}
+
+	// Path traversal protection
+	// used to access files outside
+	if strings.Contains(s, "..") {
+		return errors.New("Potential Path traversal protection")
+	}
+
+	// Null byte injection
+	// used in C to detect end of the string
+	// bypass file extension check,
+	if strings.Contains(s, "\x00") {
+		return errors.New("Potential null byte injection")
+	}
+
+	return nil
+}
+
 func parseRequest(s string) (*Request, error) {
 	lines := strings.Split(s, "\r\n")
 	if len(lines) == 0 {
-		return nil, errors.New("there arent any lines") // TODO: make better error message later
+		return nil, errors.New("could note pars request (1)")
 	}
 
-	var r Request
-	err := parseFirstLine(lines[0], &r)
+	err := checkSecurityIssues(s)
 	if err != nil {
 		return nil, err
 	}
 
-	loopingOverHeaders := true
+	var r Request
+	err = parseFirstLine(lines[0], &r)
+	if err != nil {
+		return nil, err
+	}
+
+	err = parseHeadersAndBody(lines[1:], &r)
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
+}
+
+func parseHeadersAndBody(lines []string, r *Request) error {
+	bodyStarted := false
 	body := ""
+
 	for index, line := range lines {
-		if index == 0 {
+		if line == "" { // headers and body are separated with /r/n/r/n - so the slice gives me ""
+			bodyStarted = true
 			continue
 		}
-		if line == "" { // hledam dvakrat /r/n za sebou... ale slice mi to rozdelil a udelal z toho teda empty string
-			loopingOverHeaders = false
-		}
-		if loopingOverHeaders {
-			err := parseHTTPHeader(line, &r)
-			if err != nil {
-				return nil, err
+		if bodyStarted {
+			if index != len(lines)-1 {
+				body += line + "\r\n"
 			}
 		} else {
-			body += line + "\r\n" // pridavam nakonec zbytecne novej radek
+			err := parseHTTPHeader(line, r)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	r.Body = body
-	return &r, nil
+	return nil
 }
 
 func parseHTTPHeader(s string, r *Request) error {
@@ -68,7 +109,7 @@ func parseFirstLine(s string, r *Request) error {
 
 	len := len(result)
 	if len != 3 {
-		return errors.New("there must be 3 items in first line") // TODO: make better error message when figure out whole structure
+		return errors.New("there must be 3 items in the first line")
 	}
 
 	method := result[0]
