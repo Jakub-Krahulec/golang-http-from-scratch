@@ -12,14 +12,14 @@ type Router struct {
 type Route struct {
 	Path    string
 	Method  HTTPMethod
-	Handler func(*Request) *Response
+	Handler HandlerFunc
 }
 
-func (r *Router) AddHandler(method HTTPMethod, path string, handler func(*Request) *Response) {
+func (r *Router) AddHandler(method HTTPMethod, path string, handler HandlerFunc) {
 	r.Routes = append(r.Routes, Route{path, method, handler})
 }
 
-func (r *Router) FindHandler(req *Request) (func(*Request) *Response, error) {
+func (r *Router) FindHandler(req *Request) (HandlerFunc, error) {
 	// prvni zkusim najit presnou cestu
 	for _, route := range r.Routes {
 		if route.Method == req.Method && route.Path == req.Path {

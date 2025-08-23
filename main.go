@@ -10,9 +10,10 @@ func main() {
 
 func setupServer() Server {
 	server := Server{
-		Addr:    "localhost:8080",
-		Network: "tcp",
-		Router:  Router{},
+		Addr:              "localhost:8080",
+		Network:           "tcp",
+		Router:            Router{},
+		GlobalMiddlewares: []MiddlewareFunc{LoggingMiddleware},
 	}
 	return server
 }

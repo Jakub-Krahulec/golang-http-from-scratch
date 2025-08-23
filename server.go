@@ -7,10 +7,11 @@ import (
 )
 
 type Server struct {
-	Addr     string
-	Network  string
-	Router   Router
-	Listener net.Listener
+	Addr              string
+	Network           string
+	Router            Router
+	Listener          net.Listener
+	GlobalMiddlewares []MiddlewareFunc
 }
 
 func (s *Server) startListening() {
@@ -50,11 +51,20 @@ func (s *Server) handleConnections() {
 				return
 			}
 
-			response := handler(r)
+			finalHandler := s.applyGlobalMiddlewares(handler)
+			response := finalHandler(r)
 
 			conn.Write([]byte(formatResponse(response)))
 		}(conn)
 	}
+}
+
+func (s *Server) applyGlobalMiddlewares(handler HandlerFunc) HandlerFunc {
+	result := handler
+	for _, middleware := range s.GlobalMiddlewares {
+		result = middleware(result)
+	}
+	return result
 }
 
 func readBytes(conn net.Conn) ([]byte, int, error) {
