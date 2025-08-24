@@ -15,7 +15,7 @@ type Server struct {
 }
 
 func (s *Server) startListening() {
-	fmt.Printf("Starting server")
+	fmt.Printf("Starting server\n")
 
 	l, err := net.Listen(s.Network, s.Addr)
 	if err != nil {

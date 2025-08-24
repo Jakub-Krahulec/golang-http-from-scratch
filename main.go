@@ -13,7 +13,7 @@ func setupServer() Server {
 		Addr:              "localhost:8080",
 		Network:           "tcp",
 		Router:            Router{},
-		GlobalMiddlewares: []MiddlewareFunc{LoggingMiddleware, RecoveryMiddleware},
+		GlobalMiddlewares: []MiddlewareFunc{corsMiddleware, LoggingMiddleware, RecoveryMiddleware},
 	}
 	return server
 }
