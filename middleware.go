@@ -28,6 +28,7 @@ func RecoveryMiddleware(next HandlerFunc) HandlerFunc {
 	}
 }
 
+// Cross Origin Resource Sharing
 func corsMiddleware(next HandlerFunc) HandlerFunc {
 	return func(r *Request) *Response {
 		// maybe move into helper method later if needed
