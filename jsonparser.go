@@ -37,7 +37,8 @@ type Tokenizer struct {
 }
 
 func testTokenizer() {
-	testJson := "{\"name\": \"Jakub\", \"age\": 25, \"isGod\": true, \"numbers\": [1, 2, 3]}"
+	//testJson := "{\"name\": \"Jakub\", \"age\": 25, \"isGod\": true, \"numbers\": [1, 2, 3]}"
+	testJson := "{\"name\": \"Jakub\", \"age\": -25-2, \"isGod\": true, \"numbers\": [1, 2, 3], \"object\": {\"pokus\": 232}}"
 	// testJson := "{\"name\": \"Jakub\", \"age\": 28}"
 
 	tokenizer := Tokenizer{State: Normal, Tokens: []Token{}}
@@ -84,7 +85,7 @@ func (t *Tokenizer) checkStartingAndEndingChar(s string) error {
 }
 
 func (t *Tokenizer) tokenizeInput(s string) error {
-	structuralTokens := []string{"{", "}", ",", ":"}
+	structuralTokens := []string{"{", "}", ",", ":", "[", "]"}
 	numbers := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"}
 	keywords := []string{"null", "true", "false"}
 
@@ -92,6 +93,7 @@ func (t *Tokenizer) tokenizeInput(s string) error {
 	numberBuffer := ""
 	keywordBuffer := ""
 	howManyArraysIn := 0
+	howManyObjectsIn := 0
 
 	for _, char := range s {
 		currentCharAsString := string(char)
@@ -125,6 +127,8 @@ func (t *Tokenizer) tokenizeInput(s string) error {
 				t.Tokens = append(t.Tokens, Token{Type: Structural, Value: currentCharAsString})
 				if currentCharAsString == "]" {
 					howManyArraysIn -= 1
+				} else if currentCharAsString == "}" {
+					howManyObjectsIn -= 1
 				}
 			} else {
 				return errors.New("invalid character in number")
@@ -143,7 +147,10 @@ func (t *Tokenizer) tokenizeInput(s string) error {
 				t.Tokens = append(t.Tokens, Token{Type: Structural, Value: currentCharAsString})
 				if currentCharAsString == "]" {
 					howManyArraysIn -= 1
+				} else if currentCharAsString == "}" {
+					howManyObjectsIn -= 1
 				}
+
 			} else {
 				currentCharLowered := strings.ToLower(currentCharAsString)
 				keywordBuffer += currentCharLowered
@@ -155,30 +162,37 @@ func (t *Tokenizer) tokenizeInput(s string) error {
 			} else if currentCharAsString == "\"" {
 				t.State = ReadingString
 			} else if slices.Contains(structuralTokens, currentCharAsString) {
+				if currentCharAsString == "[" {
+					howManyArraysIn += 1
+				} else if currentCharAsString == "]" {
+					if howManyArraysIn > 0 {
+						howManyArraysIn -= 1
+					} else {
+						return errors.New("there must be opening square bracket before opening")
+					}
+				} else if currentCharAsString == "{" {
+					howManyObjectsIn += 1
+				} else if currentCharAsString == "}" {
+					if howManyObjectsIn > 0 {
+						howManyObjectsIn -= 1
+					} else {
+						return errors.New("There must be opening bracket before opening")
+					}
+				}
 				t.Tokens = append(t.Tokens, Token{Type: Structural, Value: currentCharAsString})
-			} else if slices.Contains(numbers, currentCharAsString) {
+			} else if slices.Contains(numbers, currentCharAsString) || currentCharAsString == "-" {
 				numberBuffer += currentCharAsString
 				t.State = ReadingNumber
 			} else if currentCharLowered == "f" || currentCharLowered == "t" || currentCharLowered == "n" {
 				keywordBuffer += currentCharLowered
 				t.State = ReadingKeyword
-			} else if currentCharAsString == "[" {
-				t.Tokens = append(t.Tokens, Token{Type: Structural, Value: currentCharAsString})
-				howManyArraysIn += 1
-			} else if currentCharAsString == "]" {
-				if howManyArraysIn > 0 {
-					howManyArraysIn -= 1
-					t.Tokens = append(t.Tokens, Token{Type: Structural, Value: currentCharAsString})
-				} else {
-					return errors.New("there must be opening square bracket before opening")
-				}
 			} else {
 				return errors.New("invalid character " + string(char))
 			}
 		}
 	}
 
-	if t.State != Normal || howManyArraysIn > 0 {
+	if t.State != Normal || howManyArraysIn > 0 || howManyObjectsIn > 0 {
 		// I might add better error with which state it ended
 		return errors.New("invalid json.")
 	}
